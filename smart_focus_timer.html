@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuraFocus — Умный таймер концентрации</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              focus: '#f43f5e',     // Rose 500
+              short: '#10b981',     // Emerald 500
+              long: '#0ea5e9',      // Sky 500
+              dark: '#090d16',
+              card: '#131b2e',
+              border: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Плавная анимация кольца таймера */
+    .timer-ring-circle {
+      transition: stroke-dashoffset 0.8s ease-in-out, stroke 0.5s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+
+    /* Кастомный скроллбар */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 1);
+    }
+
+    /* Ползунки громкости */
+    input[type=range] {
+      accent-color: #f43f5e;
+    }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 min-h-screen font-sans antialiased selection:bg-rose-500/30 selection:text-rose-200 flex flex-col justify-between">
+
+  <!-- ================= ВЕРХНЯЯ ШАПКА ================= -->
+  <header class="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-8 py-3.5">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <!-- Логотип -->
+      <div class="flex items-center gap-3">
+        <div id="modeLogoGlow" class="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 to-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/20 transition-all duration-500">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            AuraFocus
+            <span class="text-[10px] font-mono uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full">v2.0</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Школьный проект по информатике</p>
+        </div>
+      </div>
+
+      <!-- Правые кнопки: Звуки, Аналитика, Настройки -->
+      <div class="flex items-center gap-2">
+        <!-- Кнопка микшера звуков -->
+        <button id="btnOpenSoundscapes" class="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition border border-slate-700/60">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <span class="hidden sm:inline">Звуки</span>
+          <span id="soundActiveBadge" class="w-2 h-2 rounded-full bg-emerald-400 hidden animate-pulse"></span>
+        </button>
+
+        <!-- Кнопка настроек -->
+        <button id="btnOpenSettings" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white transition border border-slate-700/60" title="Настройки">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= ОСНОВНОЙ КОНТЕНТ ================= -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+    
+    <!-- ЛЕВАЯ КОЛОНКА: ТАЙМЕР И УПРАВЛЕНИЕ (7 КОЛОНОК) -->
+    <div class="lg:col-span-7 flex flex-col items-center justify-between gap-6">
+      
+      <!-- Карточка таймера -->
+      <div class="w-full bg-[#111827]/80 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 sm:p-8 flex flex-col items-center shadow-2xl relative overflow-hidden">
+        
+        <!-- Верхние переключатели режимов -->
+        <div class="flex items-center p-1.5 bg-slate-900/90 rounded-2xl border border-slate-800 mb-6 max-w-sm w-full justify-between">
+          <button id="modeWork" class="mode-btn flex-1 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 bg-rose-500 text-white shadow-md">
+            Фокус
+          </button>
+          <button id="modeShort" class="mode-btn flex-1 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 text-slate-400 hover:text-white">
+            Короткий отдых
+          </button>
+          <button id="modeLong" class="mode-btn flex-1 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 text-slate-400 hover:text-white">
+            Длинный отдых
+          </button>
+        </div>
+
+        <!-- Круговой прогресс и таймер -->
+        <div class="relative w-64 h-64 sm:w-72 sm:h-72 my-2 flex items-center justify-center">
+          <svg class="w-full h-full" viewBox="0 0 260 260">
+            <!-- Фоновый круг -->
+            <circle
+              cx="130"
+              cy="130"
+              r="115"
+              fill="transparent"
+              stroke="#1e293b"
+              stroke-width="12"
+            />
+            <!-- Прогресс круг -->
+            <circle
+              id="timerRing"
+              class="timer-ring-circle"
+              cx="130"
+              cy="130"
+              r="115"
+              fill="transparent"
+              stroke="#f43f5e"
+              stroke-width="12"
+              stroke-linecap="round"
+              stroke-dasharray="722.56"
+              stroke-dashoffset="0"
+            />
+          </svg>
+
+          <!-- Цифры внутри круга -->
+          <div class="absolute flex flex-col items-center text-center">
+            <span id="timeDisplay" class="font-mono text-5xl sm:text-6xl font-bold tracking-tight text-white drop-shadow-md">
+              25:00
+            </span>
+            <div id="activeTaskLabel" class="text-xs sm:text-sm font-medium text-slate-400 mt-2 max-w-[180px] truncate px-3 py-1 rounded-full bg-slate-900/60 border border-slate-800">
+              Без задачи
+            </div>
+          </div>
+        </div>
+
+        <!-- Кнопки управления таймером -->
+        <div class="flex items-center gap-4 mt-6">
+          <!-- Сброс -->
+          <button id="btnReset" class="w-12 h-12 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white flex items-center justify-center transition border border-slate-700/60" title="Сбросить">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+
+          <!-- Старт / Пауза -->
+          <button id="btnTogglePlay" class="w-20 h-16 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-rose-500/25 transition duration-200">
+            <svg id="playIcon" class="w-7 h-7 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            <svg id="pauseIcon" class="w-7 h-7 hidden" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            </svg>
+          </button>
+
+          <!-- Пропуск сессии -->
+          <button id="btnSkip" class="w-12 h-12 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white flex items-center justify-center transition border border-slate-700/60" title="Пропустить сессию">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Подсказка / Статус цикла -->
+        <div class="mt-6 flex items-center gap-3 text-xs text-slate-400">
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-rose-400"></span> Сессия <span id="sessionCounter" class="font-bold text-white">#1</span>
+          </span>
+          <span>•</span>
+          <span id="streakMiniDisplay">Серия: 0 дн. 🔥</span>
+        </div>
+      </div>
+
+      <!-- Быстрый аудиоплеер фоновых шумов (Web Audio API) -->
+      <div class="w-full bg-[#111827]/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold text-slate-200">Генератор фонового шума</span>
+            <span class="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">Web Audio API</span>
+          </div>
+          <button id="btnMasterAudioToggle" class="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+            Выключить все
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <!-- Дождь -->
+          <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-300 flex items-center gap-1">🌧 Дождь</span>
+              <input type="checkbox" id="soundRainCheck" class="rounded accent-rose-500 cursor-pointer">
+            </div>
+            <input type="range" id="soundRainVol" min="0" max="1" step="0.05" value="0.5" class="w-full h-1 bg-slate-700 rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Огонь / Костер -->
+          <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-300 flex items-center gap-1">🔥 Костёр</span>
+              <input type="checkbox" id="soundFireCheck" class="rounded accent-rose-500 cursor-pointer">
+            </div>
+            <input type="range" id="soundFireVol" min="0" max="1" step="0.05" value="0.5" class="w-full h-1 bg-slate-700 rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Белый шум -->
+          <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-300 flex items-center gap-1">🌊 Шум</span>
+              <input type="checkbox" id="soundNoiseCheck" class="rounded accent-rose-500 cursor-pointer">
+            </div>
+            <input type="range" id="soundNoiseVol" min="0" max="1" step="0.05" value="0.4" class="w-full h-1 bg-slate-700 rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Дрон / Медитация -->
+          <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-xl flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-300 flex items-center gap-1">✨ Дрон</span>
+              <input type="checkbox" id="soundDroneCheck" class="rounded accent-rose-500 cursor-pointer">
+            </div>
+            <input type="range" id="soundDroneVol" min="0" max="1" step="0.05" value="0.3" class="w-full h-1 bg-slate-700 rounded-lg cursor-pointer">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ПРАВАЯ КОЛОНКА: ЗАДАЧИ И СТАТИСТИКА (5 КОЛОНОК) -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+      
+      <!-- БЛОК ЗАДАЧ НА ДЕНЬ -->
+      <div class="bg-[#111827]/80 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 shadow-2xl flex flex-col h-[340px]">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            <h2 class="font-bold text-white text-base">Задачи на день</h2>
+          </div>
+          <span id="taskCompletedCount" class="text-xs text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/60">0/0</span>
+        </div>
+
+        <!-- Поле добавления задачи -->
+        <form id="taskForm" class="flex gap-2 mb-3">
+          <input
+            type="text"
+            id="taskInput"
+            placeholder="Что нужно сделать?"
+            class="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition"
+            maxlength="60"
+            required
+          />
+          <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white rounded-xl text-sm font-medium transition shadow-md shadow-rose-600/20">
+            +
+          </button>
+        </form>
+
+        <!-- Список задач (скроллируемый) -->
+        <div id="taskList" class="flex-1 overflow-y-auto space-y-2 pr-1">
+          <!-- Рендерится через JS -->
+        </div>
+      </div>
+
+      <!-- БЛОК СТАТИСТИКИ И ГРАФИКА -->
+      <div class="bg-[#111827]/80 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 shadow-2xl flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h2 class="font-bold text-white text-base">Аналитика фокуса</h2>
+          </div>
+          <span class="text-xs text-slate-400">Последние 7 дней</span>
+        </div>
+
+        <!-- Метрики в цифрах -->
+        <div class="grid grid-cols-3 gap-2.5 mb-4">
+          <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 text-center">
+            <div class="text-[11px] text-slate-400">Сегодня</div>
+            <div id="statTodayTime" class="text-lg font-bold text-rose-400 font-mono mt-0.5">0м</div>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 text-center">
+            <div class="text-[11px] text-slate-400">Сессий</div>
+            <div id="statTotalSessions" class="text-lg font-bold text-white font-mono mt-0.5">0</div>
+          </div>
+          <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3 text-center">
+            <div class="text-[11px] text-slate-400">Стрик</div>
+            <div id="statStreakDays" class="text-lg font-bold text-amber-400 font-mono mt-0.5">0 дн.</div>
+          </div>
+        </div>
+
+        <!-- Canvas графика Chart.js -->
+        <div class="h-44 w-full relative">
+          <canvas id="focusChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ================= ПОДВАЛ ================= -->
+  <footer class="border-t border-slate-800/60 py-4 px-4 text-center text-xs text-slate-500">
+    AuraFocus • Индивидуальный проект по информатике • Хранение данных в <code class="text-slate-400 font-mono">localStorage</code>
+  </footer>
+
+  <!-- ================= МОДАЛЬНОЕ ОКНО НАСТРОЕК ================= -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#111827] border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          ⚙️ Настройки таймера
+        </h3>
+        <button id="btnCloseSettings" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Время фокуса (минуты)</label>
+          <input type="number" id="settingWorkTime" min="1" max="120" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-rose-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Короткий отдых (минуты)</label>
+          <input type="number" id="settingShortTime" min="1" max="60" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Длинный отдых (минуты)</label>
+          <input type="number" id="settingLongTime" min="1" max="90" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-sky-500">
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-sm text-slate-300">Звуковой сигнал по окончанию</span>
+          <input type="checkbox" id="settingChimeEnabled" class="accent-rose-500 w-4 h-4 cursor-pointer" checked>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-800">
+        <button id="btnSaveSettings" class="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl text-sm transition">
+          Сохранить изменения
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= УВЕДОМЛЕНИЕ / TOAST (ВМЕСТО ALERT) ================= -->
+  <div id="toastNotification" class="fixed bottom-5 right-5 z-50 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toastIcon" class="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
+    <span id="toastMessage" class="text-sm font-medium">Уведомление</span>
+  </div>
+
+  <!-- ================= СВЯЗУЮЩИЙ СЦЕНАРИЙ JS ================= -->
+  <script>
+    /**
+     * СИСТЕМА УПРАВЛЕНИЯ ТАЙМЕРОМ И ХРАНИЛИЩЕМ AURA FOCUS
+     * Разработано для демонстрации на уроках информатики:
+     * - Web Audio API (генерация звуковых волн программно)
+     * - Canvas + Chart.js (визуализация массивов данных)
+     * - DOM manipulation & LocalStorage
+     */
+
+    // --- 1. НАСТРОЙКИ ПО УМОЛЧАНИЮ И СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
+    const STORAGE_KEY_SETTINGS = 'aurafocus_settings';
+    const STORAGE_KEY_TASKS = 'aurafocus_tasks';
+    const STORAGE_KEY_ANALYTICS = 'aurafocus_analytics';
+
+    let settings = {
+      workTime: 25,
+      shortTime: 5,
+      longTime: 15,
+      chimeEnabled: true
+    };
+
+    let currentMode = 'work'; // 'work' | 'short' | 'long'
+    let timerInterval = null;
+    let isRunning = false;
+    let timeLeft = settings.workTime * 60;
+    let totalSessionTime = settings.workTime * 60;
+    let completedSessionsCount = 0;
+    let activeTaskId = null;
+
+    // --- 2. СИНТЕЗАТОР ЗВУКОВ (WEB AUDIO API) ---
+    // Без внешних аудиофайлов: белый шум, фильтрация для дождя, случайные импульсы для огня
+    let audioCtx = null;
+    const soundNodes = {
+      rain: { filter: null, gain: null, playing: false },
+      fire: { bufferSource: null, gain: null, playing: false },
+      noise: { gain: null, playing: false },
+      drone: { osc1: null, osc2: null, gain: null, playing: false }
+    };
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Приятный аккорд-колокольчик окончания сессии (C-maj triad chime)
+    function playChime() {
+      if (!settings.chimeEnabled) return;
+      initAudioContext();
+
+      const freqs = [523.25, 659.25, 783.99, 1046.50]; // Ноты C5, E5, G5, C6
+      freqs.forEach((freq, index) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.1);
+
+        gain.gain.setValueAtTime(0.001, audioCtx.currentTime + index * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.2, audioCtx.currentTime + index * 0.1 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + index * 0.1 + 1.8);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(audioCtx.currentTime + index * 0.1);
+        osc.stop(audioCtx.currentTime + index * 0.1 + 1.9);
+      });
+    }
+
+    // Генерация буфера белого шума на 2 секунды с зацикливанием
+    function createNoiseBuffer() {
+      const bufferSize = audioCtx.sampleRate * 2;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      return buffer;
+    }
+
+    // Включение/выключение Дождя (Низкочастотно фильтрованный белый шум)
+    function toggleRain(enable, volume = 0.5) {
+      initAudioContext();
+      if (enable) {
+        if (soundNodes.rain.playing) return;
+        const noiseSrc = audioCtx.createBufferSource();
+        noiseSrc.buffer = createNoiseBuffer();
+        noiseSrc.loop = true;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 800; // Мягкий шум воды
+
+        const gain = audioCtx.createGain();
+        gain.gain.value = volume * 0.2;
+
+        noiseSrc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        noiseSrc.start();
+        soundNodes.rain = { src: noiseSrc, filter, gain, playing: true };
+      } else if (soundNodes.rain.playing) {
+        try { soundNodes.rain.src.stop(); } catch(e){}
+        soundNodes.rain.playing = false;
+      }
+      checkAnyAudioActive();
+    }
+
+    // Включение/выключение Белого шума
+    function toggleNoise(enable, volume = 0.4) {
+      initAudioContext();
+      if (enable) {
+        if (soundNodes.noise.playing) return;
+        const noiseSrc = audioCtx.createBufferSource();
+        noiseSrc.buffer = createNoiseBuffer();
+        noiseSrc.loop = true;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1200;
+        filter.Q.value = 0.6;
+
+        const gain = audioCtx.createGain();
+        gain.gain.value = volume * 0.08;
+
+        noiseSrc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        noiseSrc.start();
+        soundNodes.noise = { src: noiseSrc, gain, playing: true };
+      } else if (soundNodes.noise.playing) {
+        try { soundNodes.noise.src.stop(); } catch(e){}
+        soundNodes.noise.playing = false;
+      }
+      checkAnyAudioActive();
+    }
+
+    // Включение/выключение Костра (Низкий рокот + легкое потрескивание)
+    let fireInterval = null;
+    function toggleFire(enable, volume = 0.5) {
+      initAudioContext();
+      if (enable) {
+        if (soundNodes.fire.playing) return;
+        // Базовый гул пламени
+        const noiseSrc = audioCtx.createBufferSource();
+        noiseSrc.buffer = createNoiseBuffer();
+        noiseSrc.loop = true;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 250;
+
+        const gain = audioCtx.createGain();
+        gain.gain.value = volume * 0.3;
+
+        noiseSrc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        noiseSrc.start();
+
+        // Периодические потрескивания (микро-щелчки)
+        fireInterval = setInterval(() => {
+          if (!soundNodes.fire.playing || Math.random() > 0.4) return;
+          const crackle = audioCtx.createOscillator();
+          const crackleGain = audioCtx.createGain();
+          crackle.type = 'triangle';
+          crackle.frequency.value = 800 + Math.random() * 1500;
+          crackleGain.gain.setValueAtTime(0.04 * volume, audioCtx.currentTime);
+          crackleGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.04);
+          crackle.connect(crackleGain);
+          crackleGain.connect(audioCtx.destination);
+          crackle.start();
+          crackle.stop(audioCtx.currentTime + 0.05);
+        }, 120);
+
+        soundNodes.fire = { src: noiseSrc, gain, playing: true };
+      } else if (soundNodes.fire.playing) {
+        clearInterval(fireInterval);
+        try { soundNodes.fire.src.stop(); } catch(e){}
+        soundNodes.fire.playing = false;
+      }
+      checkAnyAudioActive();
+    }
+
+    // Включение/выключение Бинаурального дрона (Гармонические синусоиды)
+    function toggleDrone(enable, volume = 0.3) {
+      initAudioContext();
+      if (enable) {
+        if (soundNodes.drone.playing) return;
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        // 136.1 Hz (Частота Ом) + разница в 4 Гц для тета-ритма концентрации
+        osc1.frequency.value = 136.1;
+        osc2.frequency.value = 140.1;
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+
+        gain.gain.value = volume * 0.07;
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc1.start();
+        osc2.start();
+
+        soundNodes.drone = { osc1, osc2, gain, playing: true };
+      } else if (soundNodes.drone.playing) {
+        try {
+          soundNodes.drone.osc1.stop();
+          soundNodes.drone.osc2.stop();
+        } catch(e){}
+        soundNodes.drone.playing = false;
+      }
+      checkAnyAudioActive();
+    }
+
+    function checkAnyAudioActive() {
+      const anyActive = soundNodes.rain.playing || soundNodes.fire.playing || soundNodes.noise.playing || soundNodes.drone.playing;
+      const badge = document.getElementById('soundActiveBadge');
+      if (anyActive) {
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // --- 3. ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА И ЭЛЕМЕНТОВ ---
+    const timeDisplay = document.getElementById('timeDisplay');
+    const timerRing = document.getElementById('timerRing');
+    const btnTogglePlay = document.getElementById('btnTogglePlay');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const btnReset = document.getElementById('btnReset');
+    const btnSkip = document.getElementById('btnSkip');
+    const sessionCounter = document.getElementById('sessionCounter');
+    const activeTaskLabel = document.getElementById('activeTaskLabel');
+    const streakMiniDisplay = document.getElementById('streakMiniDisplay');
+    const modeLogoGlow = document.getElementById('modeLogoGlow');
+
+    const modeWork = document.getElementById('modeWork');
+    const modeShort = document.getElementById('modeShort');
+    const modeLong = document.getElementById('modeLong');
+
+    const RING_CIRCUMFERENCE = 2 * Math.PI * 115; // 722.56px
+    timerRing.style.strokeDasharray = `${RING_CIRCUMFERENCE}`;
+
+    function loadSettings() {
+      const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
+      if (saved) {
+        try {
+          settings = { ...settings, ...JSON.parse(saved) };
+        } catch (e) {
+          console.error('Ошибка чтения настроек', e);
+        }
+      }
+      document.getElementById('settingWorkTime').value = settings.workTime;
+      document.getElementById('settingShortTime').value = settings.shortTime;
+      document.getElementById('settingLongTime').value = settings.longTime;
+      document.getElementById('settingChimeEnabled').checked = settings.chimeEnabled;
+    }
+
+    function saveSettings() {
+      settings.workTime = Math.max(1, parseInt(document.getElementById('settingWorkTime').value) || 25);
+      settings.shortTime = Math.max(1, parseInt(document.getElementById('settingShortTime').value) || 5);
+      settings.longTime = Math.max(1, parseInt(document.getElementById('settingLongTime').value) || 15);
+      settings.chimeEnabled = document.getElementById('settingChimeEnabled').checked;
+
+      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+      showToast('Настройки успешно сохранены');
+      switchMode(currentMode, true);
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      timeDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      // Обновление заголовка страницы
+      document.title = `${timeDisplay.textContent} — ${currentMode === 'work' ? 'Фокус' : 'Отдых'} | AuraFocus`;
+
+      // Расчет кругового индикатора
+      const progress = (totalSessionTime - timeLeft) / totalSessionTime;
+      const offset = RING_CIRCUMFERENCE - (progress * RING_CIRCUMFERENCE);
+      timerRing.style.strokeDashoffset = offset;
+    }
+
+    function switchMode(mode, forceReset = false) {
+      if (isRunning && !forceReset) {
+        pauseTimer();
+      }
+
+      currentMode = mode;
+      let durationMinutes = settings.workTime;
+
+      // Сброс стилей кнопок
+      [modeWork, modeShort, modeLong].forEach(btn => {
+        btn.className = "mode-btn flex-1 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 text-slate-400 hover:text-white";
+      });
+
+      if (mode === 'work') {
+        durationMinutes = settings.workTime;
+        modeWork.className = "mode-btn flex-1 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 bg-rose-500 text-white shadow-md";
+        timerRing.setAttribute('stroke', '#f43f5e');
+        btnTogglePlay.className = "w-20 h-16 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-rose-500/25 transition duration-200";
+        modeLogoGlow.className = "w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 to-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/20 transition-all duration-500";
+      } else if (mode === 'short') {
+        durationMinutes = settings.shortTime;
+        modeShort.className = "mode-btn flex-1 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 bg-emerald-500 text-white shadow-md";
+        timerRing.setAttribute('stroke', '#10b981');
+        btnTogglePlay.className = "w-20 h-16 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-emerald-500/25 transition duration-200";
+        modeLogoGlow.className = "w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 transition-all duration-500";
+      } else if (mode === 'long') {
+        durationMinutes = settings.longTime;
+        modeLong.className = "mode-btn flex-1 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 bg-sky-500 text-white shadow-md";
+        timerRing.setAttribute('stroke', '#0ea5e9');
+        btnTogglePlay.className = "w-20 h-16 rounded-2xl bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-sky-500/25 transition duration-200";
+        modeLogoGlow.className = "w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-400 flex items-center justify-center shadow-lg shadow-sky-500/20 transition-all duration-500";
+      }
+
+      totalSessionTime = durationMinutes * 60;
+      timeLeft = totalSessionTime;
+      updateTimerDisplay();
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      initAudioContext();
+      isRunning = true;
+      playIcon.classList.add('hidden');
+      pauseIcon.classList.remove('hidden');
+
+      timerInterval = setInterval(() => {
+        if (timeLeft > 0) {
+          timeLeft--;
+          updateTimerDisplay();
+        } else {
+          handleSessionComplete();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      if (!isRunning) return;
+      isRunning = false;
+      playIcon.classList.remove('hidden');
+      pauseIcon.classList.add('hidden');
+      clearInterval(timerInterval);
+    }
+
+    function resetCurrentTimer() {
+      pauseTimer();
+      timeLeft = totalSessionTime;
+      updateTimerDisplay();
+    }
+
+    function handleSessionComplete() {
+      pauseTimer();
+      playChime();
+
+      if (currentMode === 'work') {
+        completedSessionsCount++;
+        sessionCounter.textContent = `#${completedSessionsCount + 1}`;
+
+        // Фиксация минут в аналитику
+        recordFocusMinutes(settings.workTime);
+
+        // Если привязана задача, увеличиваем счётчик выполненных помодоро
+        if (activeTaskId !== null) {
+          incrementTaskPomodoro(activeTaskId);
+        }
+
+        showToast('🎉 Фокус-сессия завершена! Время отдохнуть.');
+
+        // Каждые 4 сессии — длинный отдых
+        if (completedSessionsCount % 4 === 0) {
+          switchMode('long');
+        } else {
+          switchMode('short');
+        }
+      } else {
+        showToast('☕ Отдых окончен! Готовы снова в бой?');
+        switchMode('work');
+      }
+    }
+
+    // --- 4. МЕНЕДЖЕР ЗАДАЧ (LOCALSTORAGE) ---
+    let tasks = [];
+
+    function loadTasks() {
+      const saved = localStorage.getItem(STORAGE_KEY_TASKS);
+      if (saved) {
+        try {
+          tasks = JSON.parse(saved);
+        } catch(e) { tasks = []; }
+      }
+      renderTasks();
+    }
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+      renderTasks();
+    }
+
+    function addTask(title) {
+      if (!title.trim()) return;
+      tasks.push({
+        id: Date.now(),
+        title: title.trim(),
+        completed: false,
+        pomodoros: 0
+      });
+      saveTasks();
+    }
+
+    function toggleTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        task.completed = !task.completed;
+        if (task.completed && activeTaskId === id) {
+          setActiveTask(null);
+        }
+        saveTasks();
+      }
+    }
+
+    function deleteTask(id) {
+      if (activeTaskId === id) {
+        setActiveTask(null);
+      }
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+    }
+
+    function incrementTaskPomodoro(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        task.pomodoros = (task.pomodoros || 0) + 1;
+        saveTasks();
+      }
+    }
+
+    function setActiveTask(id) {
+      activeTaskId = id;
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        activeTaskLabel.textContent = `🎯 ${task.title}`;
+        activeTaskLabel.classList.add('text-rose-400', 'border-rose-500/30');
+      } else {
+        activeTaskLabel.textContent = 'Без задачи';
+        activeTaskLabel.classList.remove('text-rose-400', 'border-rose-500/30');
+      }
+      renderTasks();
+    }
+
+    function renderTasks() {
+      const listEl = document.getElementById('taskList');
+      const counterEl = document.getElementById('taskCompletedCount');
+      listEl.innerHTML = '';
+
+      const completedCount = tasks.filter(t => t.completed).length;
+      counterEl.textContent = `${completedCount}/${tasks.length}`;
+
+      if (tasks.length === 0) {
+        listEl.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-slate-500 text-xs py-8">
+            <svg class="w-8 h-8 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Список задач пуст. Добавьте цель на сегодня!
+          </div>
+        `;
+        return;
+      }
+
+      tasks.forEach(task => {
+        const isActive = activeTaskId === task.id;
+        const div = document.createElement('div');
+        div.className = `group flex items-center justify-between p-2.5 rounded-xl border transition-all ${
+          isActive 
+            ? 'bg-rose-500/10 border-rose-500/40 text-white' 
+            : task.completed 
+              ? 'bg-slate-900/40 border-slate-800/50 text-slate-500 opacity-60' 
+              : 'bg-slate-900/70 border-slate-800 hover:border-slate-700 text-slate-200'
+        }`;
+
+        div.innerHTML = `
+          <div class="flex items-center gap-2.5 flex-1 min-w-0 mr-2 cursor-pointer" onclick="toggleTask(${task.id})">
+            <input type="checkbox" ${task.completed ? 'checked' : ''} class="rounded accent-rose-500 cursor-pointer pointer-events-none">
+            <span class="text-xs truncate ${task.completed ? 'line-through' : ''}">${task.title}</span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 flex items-center gap-1" title="Завершено помодоро">
+              🍅 ${task.pomodoros || 0}
+            </span>
+            ${!task.completed ? `
+              <button onclick="setActiveTask(${isActive ? 'null' : task.id})" class="p-1 rounded text-xs hover:text-white ${isActive ? 'text-rose-400 font-bold' : 'text-slate-500'}" title="${isActive ? 'Снять фокус' : 'Сфокусироваться на задаче'}">
+                ${isActive ? '★' : '☆'}
+              </button>
+            ` : ''}
+            <button onclick="deleteTask(${task.id})" class="p-1 text-slate-500 hover:text-rose-400 rounded transition opacity-0 group-hover:opacity-100" title="Удалить">
+              ✕
+            </button>
+          </div>
+        `;
+        listEl.appendChild(div);
+      });
+    }
+
+    // --- 5. АНАЛИТИКА, СТРИКИ И CHART.JS ---
+    let focusChartInstance = null;
+    let analyticsData = {}; // Формат: { "YYYY-MM-DD": minutes }
+
+    function getTodayKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function loadAnalytics() {
+      const saved = localStorage.getItem(STORAGE_KEY_ANALYTICS);
+      if (saved) {
+        try {
+          analyticsData = JSON.parse(saved);
+        } catch(e) { analyticsData = {}; }
+      }
+      updateAnalyticsUI();
+    }
+
+    function recordFocusMinutes(minutes) {
+      const today = getTodayKey();
+      analyticsData[today] = (analyticsData[today] || 0) + minutes;
+      localStorage.setItem(STORAGE_KEY_ANALYTICS, JSON.stringify(analyticsData));
+      updateAnalyticsUI();
+    }
+
+    function calculateStreak() {
+      let streak = 0;
+      let checkDate = new Date();
+      
+      while (true) {
+        const key = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+        if (analyticsData[key] && analyticsData[key] > 0) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          // Если сегодня еще не успели, но вчера было, серия не прерывается
+          if (streak === 0) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            const yesterdayKey = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+            if (analyticsData[yesterdayKey] && analyticsData[yesterdayKey] > 0) {
+              streak++;
+              checkDate.setDate(checkDate.getDate() - 1);
+              continue;
+            }
+          }
+          break;
+        }
+      }
+      return streak;
+    }
+
+    function updateAnalyticsUI() {
+      const today = getTodayKey();
+      const todayMinutes = analyticsData[today] || 0;
+      const streak = calculateStreak();
+
+      document.getElementById('statTodayTime').textContent = `${todayMinutes}м`;
+      document.getElementById('statTotalSessions').textContent = completedSessionsCount;
+      document.getElementById('statStreakDays').textContent = `${streak} дн.`;
+      streakMiniDisplay.textContent = `Серия: ${streak} дн. 🔥`;
+
+      renderChart();
+    }
+
+    function getLast7DaysData() {
+      const labels = [];
+      const values = [];
+      const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        labels.push(dayNames[d.getDay()]);
+        values.push(analyticsData[key] || 0);
+      }
+      return { labels, values };
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('focusChart').getContext('2d');
+      const { labels, values } = getLast7DaysData();
+
+      if (focusChartInstance) {
+        focusChartInstance.destroy();
+      }
+
+      focusChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Минуты фокуса',
+            data: values,
+            backgroundColor: values.map((val, idx) => idx === 6 ? '#f43f5e' : 'rgba(244, 63, 94, 0.35)'),
+            borderRadius: 6,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              titleColor: '#f8fafc',
+              bodyColor: '#cbd5e1',
+              padding: 8,
+              cornerRadius: 8,
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.parsed.y} минут концентрации`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false, drawBorder: false },
+              ticks: { color: '#64748b', font: { size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(51, 65, 85, 0.25)', drawBorder: false },
+              ticks: { color: '#64748b', font: { size: 10 }, stepSize: 20 }
+            }
+          }
+        }
+      });
+    }
+
+    // --- 6. УВЕДОМЛЕНИЯ В ИНТЕРФЕЙСЕ (ВМЕСТО АЛЕРТОВ) ---
+    function showToast(message) {
+      const toast = document.getElementById('toastNotification');
+      const msg = document.getElementById('toastMessage');
+      msg.textContent = message;
+
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-24', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 3500);
+    }
+
+    // --- 7. СЛУШАТЕЛИ СОБЫТИЙ ---
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSettings();
+      loadTasks();
+      loadAnalytics();
+      switchMode('work', true);
+
+      // Кнопки управления таймером
+      btnTogglePlay.addEventListener('click', () => {
+        if (isRunning) pauseTimer();
+        else startTimer();
+      });
+
+      btnReset.addEventListener('click', resetCurrentTimer);
+      btnSkip.addEventListener('click', handleSessionComplete);
+
+      modeWork.addEventListener('click', () => switchMode('work'));
+      modeShort.addEventListener('click', () => switchMode('short'));
+      modeLong.addEventListener('click', () => switchMode('long'));
+
+      // Задачи
+      document.getElementById('taskForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('taskInput');
+        addTask(input.value);
+        input.value = '';
+      });
+
+      // Настройки модального окна
+      const settingsModal = document.getElementById('settingsModal');
+      document.getElementById('btnOpenSettings').addEventListener('click', () => {
+        settingsModal.classList.remove('hidden');
+      });
+      document.getElementById('btnCloseSettings').addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+      });
+      document.getElementById('btnSaveSettings').addEventListener('click', () => {
+        saveSettings();
+        settingsModal.classList.add('hidden');
+      });
+
+      // Переход к блоку звуков по кнопке в шапке
+      document.getElementById('btnOpenSoundscapes').addEventListener('click', () => {
+        document.getElementById('soundRainCheck').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast('Настройте атмосферу: дождь, костер или дрон 🎧');
+      });
+
+      // Звуковые ползунки и чекбоксы
+      document.getElementById('soundRainCheck').addEventListener('change', (e) => {
+        toggleRain(e.target.checked, parseFloat(document.getElementById('soundRainVol').value));
+      });
+      document.getElementById('soundRainVol').addEventListener('input', (e) => {
+        if (soundNodes.rain.gain) soundNodes.rain.gain.gain.value = parseFloat(e.target.value) * 0.2;
+      });
+
+      document.getElementById('soundFireCheck').addEventListener('change', (e) => {
+        toggleFire(e.target.checked, parseFloat(document.getElementById('soundFireVol').value));
+      });
+      document.getElementById('soundFireVol').addEventListener('input', (e) => {
+        if (soundNodes.fire.gain) soundNodes.fire.gain.gain.value = parseFloat(e.target.value) * 0.3;
+      });
+
+      document.getElementById('soundNoiseCheck').addEventListener('change', (e) => {
+        toggleNoise(e.target.checked, parseFloat(document.getElementById('soundNoiseVol').value));
+      });
+      document.getElementById('soundNoiseVol').addEventListener('input', (e) => {
+        if (soundNodes.noise.gain) soundNodes.noise.gain.gain.value = parseFloat(e.target.value) * 0.08;
+      });
+
+      document.getElementById('soundDroneCheck').addEventListener('change', (e) => {
+        toggleDrone(e.target.checked, parseFloat(document.getElementById('soundDroneVol').value));
+      });
+      document.getElementById('soundDroneVol').addEventListener('input', (e) => {
+        if (soundNodes.drone.gain) soundNodes.drone.gain.gain.value = parseFloat(e.target.value) * 0.07;
+      });
+
+      // Быстрое отключение всех фоновых шумов
+      document.getElementById('btnMasterAudioToggle').addEventListener('click', () => {
+        ['soundRainCheck', 'soundFireCheck', 'soundNoiseCheck', 'soundDroneCheck'].forEach(id => {
+          document.getElementById(id).checked = false;
+        });
+        toggleRain(false);
+        toggleFire(false);
+        toggleNoise(false);
+        toggleDrone(false);
+        showToast('Все звуки выключены');
+      });
+    });
+  </script>
+</body>
+</html>
